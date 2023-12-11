@@ -1,0 +1,234 @@
+﻿@{
+    ViewData["Title"] = "Home Page";
+
+    //Javascript kaynakları;
+
+    //SignalR Javascript Dökümanı: https://learn.microsoft.com/en-us/aspnet/core/signalr/javascript-client?view=aspnetcore-8.0&tabs=visual-studio
+    //https://learn.microsoft.com/tr-tr/aspnet/core/signalr/javascript-client?view=aspnetcore-8.0&tabs=visual-studio
+
+    //Javascript inkove ve send nedir? : https://stackoverflow.com/a/50870783
+
+    //Turkce kaynak: https://learn.microsoft.com/tr-tr/aspnet/core/signalr/javascript-client?view=aspnetcore-8.0&tabs=visual-studio
+
+}
+
+<div class="text-center">
+    <h1 class="display-4">Welcome to SignalR Example</h1>
+</div>
+
+
+<div class="row">
+
+    <div class="col-md-6">
+
+        <div class="mb-2">
+
+            <label>User Name Or Email</label>
+            <input class="form-control" id="name" />
+
+        </div>
+
+        <div>
+            <label>Message</label>
+            <textarea class="form-control" style="max-height: 150px; height: 150px;" id="message"></textarea>
+        </div>
+
+        <div class="d-flex justify-content-center my-4">
+
+            <button class="btn btn-outline-success me-2" id="btn_invoke" >
+                Invoke ile gönder
+            </button>
+
+            <button class="btn btn-outline-success" id="btn_send">
+                Send ile gönder
+            </button>
+
+        </div>
+
+
+    </div>
+
+
+    <div class="col-md-6">
+
+        <label>
+            Outputs
+        </label>
+
+        <div class="panel panel-primary" id="result_panel">
+            <div class="panel-body">
+                <ul class="list-group" id="myloglist"></ul>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+@section Css
+{
+    <style>
+        .list-group {
+            max-height: 300px;
+            margin-bottom: 10px;
+            overflow: scroll;
+            -webkit-overflow-scrolling: touch;
+        }
+    </style>    
+
+}
+
+
+
+@section Scripts{
+
+    @*SignalR, javascript kütüphanesi.*@
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.1/signalr.js"></script>
+
+    <script type="text/javascript">
+
+        function AddList(item){
+            $("#myloglist").append(item);
+        }
+
+    </script>
+       
+
+    <script type="text/javascript">
+
+        $(document).ready(() => {
+
+            //SignalR tanımlaması burada gerçekleşir.
+            const connection = new signalR.HubConnectionBuilder()
+            .withUrl("/MyHub") // MVC projesinde direkt hub yolu verilir. API'da ki bir signalR için api üzerinde ki hub endpoint'i verilir.
+            .configureLogging(signalR.LogLevel.Information)
+            .build();
+
+
+            //SignalR'a bağlantı sağlar.
+            async function start() {
+                try {
+                    await connection.start();
+
+                    AddList(`<li class="list-group-item text-success">
+                            <strong>SignalR bağlntısı başarılı.</strong>
+                    </li> `);
+
+                } catch (err) {
+                    console.log(err);
+                    setTimeout(start, 5000);
+                }
+            };
+
+
+            //SignalR events
+            connection.onclose(async (error) => {
+                await start();
+
+                console.assert(connection.state === signalR.HubConnectionState.Disconnected);
+
+                AddList(`<li class="list-group-item text-danger">
+                        <strong>Connection closed due to error "${error}". Try refreshing this page to restart the connection.</strong>
+                </li> `);
+            });
+
+
+            connection.onreconnected(connectionId => {
+                console.log(connection.state === signalR.HubConnectionState.Connected);
+
+                AddList(`<li class="list-group-item text-warning">
+                    <strong>Reconnected to server. (${connection.state === signalR.HubConnectionState.Connected})</strong>
+                </li> `);
+
+            });
+            //SignalR events
+
+
+            // Start the connection.
+            start();
+
+
+
+            //SignalR Response methodlarının tanımlanması.
+
+            connection.on("SendMethodResponse", (message) => {
+                
+                AddList(`<li class="list-group-item">
+                    <strong>Send Method</strong>
+                    <div>
+                        ${message}
+                    </div>
+                </li> `);
+
+            });
+
+
+            /*
+            
+                Örnek başka bir kullanım;
+                connection.on<Donus_VeriTuru>("SendMethodResponse", (degiskenAdi) => {});
+                
+                connection.on<string>("SendMethodResponse", (message) => {});
+
+                Donus_VeriTuru: Burası herhangi bir nesne olabilir, herhangi bir değişken türü olabilir veya model olabilir. 
+                Method'dan dönecek olan türe göre ayarlanmalıdır.
+
+                Eğer Method int, string, bool sıralamasında bir yanıt dönüyorsa aşağıdaki gibi yazılabilir.
+
+                connection.on<int, string, bool>("SendMethodResponse", (age, message, deleted) => {});
+            
+            */
+
+
+            //Standart javascript / jquery kodları;
+
+
+            $("#btn_invoke").click(async () => {
+
+                var userMessage = $("#message").val();
+                var user = $("#name").val();
+
+                try {
+
+                    //Invoke: Geriye veri döndüren hub methodlarında kullanılır. Method içerisinde geriye döndürülen veriyi / nesneyi bir değişkende tutar.
+                    var response = await connection.invoke("Test-Invoke-Method", `${user}`, `${userMessage}`);
+
+                    AddList(`<li class="list-group-item">
+                        <strong>Invoke Method</strong>
+                        <div>
+                            ${response}
+                        </div>
+                    </li> `);
+
+                } catch (err) {
+                    console.error("(Invoke error) Mesaj gönderilemedi! Hata:  " + err);
+                }
+            });
+
+
+
+            $("#btn_send").click(async () => {
+
+                var userMessage = $("#message").val();
+                var user = $("#name").val();
+
+                try {
+                    //Send: Geriye veri döndürmeyen (void) hub methodlarında kullanılır. Void türündedir. Method içerisinde ilgili reponse method'a verileri gönderir.
+                    await connection.send("Test-Send-Method", `${user}`, `${userMessage}`);
+
+                } catch (err) {
+                    console.error("(Send error) Mesaj gönderilemedi! Hata:  " + err);
+                }
+            });
+
+            
+        });
+
+    </script>
+
+
+}
